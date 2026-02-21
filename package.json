@@ -1,6 +1,7 @@
 {
   "name": "ms-products-tests",
   "version": "1.0.0",
+  "type": "module",
   "description": "E2E tests para ms-products-api usando Playwright",
   "scripts": {
     "test": "playwright test",
