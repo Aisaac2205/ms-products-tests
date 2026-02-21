@@ -117,7 +117,8 @@ jobs:
       - name: Levantar FastAPI en background
         run: |
           cd api
-          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+          echo "PID uvicorn: $!"
         env:
           DATABASE_URL: postgresql://testuser:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/productsdb
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
@@ -126,6 +127,10 @@ jobs:
 
       - name: Esperar que la API esté lista
         run: npx wait-on http://localhost:8000/health --timeout 30000
+
+      - name: Mostrar logs de uvicorn si falló
+        if: failure()
+        run: cat /tmp/uvicorn.log
 
       # ── Instalar y correr Playwright ─────────────────────
       - uses: actions/setup-node@v4
