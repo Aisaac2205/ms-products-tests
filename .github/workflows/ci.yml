@@ -1,0 +1,168 @@
+# ============================================================
+# ms-products-tests — .github/workflows/ci.yml
+#
+# Pipeline principal del equipo SQA.
+# Se puede disparar de dos formas:
+#   1. Manualmente (workflow_dispatch) desde GitHub UI
+#   2. Automáticamente desde ms-products-api cuando hay un push
+# ============================================================
+
+name: E2E Tests — ms-products-api
+
+on:
+  # Cuando se modifica algo en este repo de tests
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+  # Cuando el repo de la API lo dispara remotamente
+  workflow_dispatch:
+    inputs:
+      triggered_by:
+        description: "¿Quién disparó este workflow?"
+        required: false
+        default: "manual"
+      commit_sha:
+        description: "SHA del commit de la API"
+        required: false
+      branch:
+        description: "Branch de la API"
+        required: false
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+
+  # ── INFO: mostrar contexto del trigger ───────────────────
+  context:
+    name: Contexto del trigger
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mostrar quién disparó el pipeline
+        run: |
+          echo "Disparado por: ${{ github.event.inputs.triggered_by || 'push/PR directo' }}"
+          echo "API commit SHA: ${{ github.event.inputs.commit_sha || 'N/A' }}"
+          echo "API branch: ${{ github.event.inputs.branch || 'N/A' }}"
+
+  # ── STAGE 1: Lint del código TypeScript ──────────────────
+  lint:
+    name: Lint TypeScript
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Correr ESLint
+        run: npm run lint
+
+  # ── STAGE 2: E2E Tests ───────────────────────────────────
+  e2e:
+    name: E2E Tests con Playwright
+    runs-on: ubuntu-latest
+    needs: [lint]
+
+    # ── Service: PostgreSQL ──────────────────────────────
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: productsdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Levantar la API (FastAPI) ────────────────────────
+      - name: Clonar ms-products-api
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/ms-products-api
+          # Si el repo es privado, necesitas el PAT_TOKEN aquí también
+          # token: ${{ secrets.PAT_TOKEN }}
+          path: api  # Se clona en la carpeta ./api
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: api/requirements.txt
+
+      - name: Instalar dependencias FastAPI
+        run: pip install -r api/requirements.txt
+
+      - name: Levantar FastAPI en background
+        run: |
+          cd api
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        env:
+          DATABASE_URL: postgresql://testuser:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/productsdb
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ADMIN_USERNAME: admin
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+
+      - name: ⏳ Esperar que la API esté lista
+        run: npx wait-on http://localhost:8000/health --timeout 30000
+
+      # ── Instalar y correr Playwright ─────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Instalar dependencias Playwright
+        run: npm ci
+
+      - name: Instalar browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Correr tests E2E
+        run: npm test
+        env:
+          BASE_URL: http://localhost:8000
+          CI: true
+
+      # ── Reporte ──────────────────────────────────────────
+      - name: Subir reporte HTML
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 30
+
+  # ── STAGE 3: Resumen final ────────────────────────────────
+  summary:
+    name: Resultado Final
+    runs-on: ubuntu-latest
+    needs: [e2e]
+    if: always()
+
+    steps:
+      - name: Tests pasaron
+        if: needs.e2e.result == 'success'
+        run: echo "Todos los tests E2E pasaron correctamente."
+
+      - name: Tests fallaron
+        if: needs.e2e.result == 'failure'
+        run: |
+          echo "Tests fallaron. Revisar el reporte en la sección Artifacts."
+          exit 1
