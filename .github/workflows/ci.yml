@@ -33,10 +33,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Mostrar quien disparo el pipeline
+        env:
+          TRIGGERED_BY: ${{ github.event.inputs.triggered_by || 'push/PR directo' }}
+          COMMIT_SHA: ${{ github.event.inputs.commit_sha || 'N/A' }}
+          BRANCH: ${{ github.event.inputs.branch || 'N/A' }}
         run: |
-          echo "Disparado por: ${{ github.event.inputs.triggered_by || 'push/PR directo' }}"
-          echo "API commit SHA: ${{ github.event.inputs.commit_sha || 'N/A' }}"
-          echo "API branch: ${{ github.event.inputs.branch || 'N/A' }}"
+          echo "Disparado por: $TRIGGERED_BY"
+          echo "API commit SHA: $COMMIT_SHA"
+          echo "API branch: $BRANCH"
 
   lint:
     name: Lint TypeScript
@@ -88,6 +92,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/ms-products-api
+          ref: ${{ github.event.inputs.commit_sha || github.event.inputs.branch || github.ref }}
           path: api
 
       - uses: actions/setup-python@v5
