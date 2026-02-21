@@ -126,7 +126,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
 
       - name: Esperar que la API esté lista
-        run: npx wait-on http://localhost:8000/health --timeout 30000
+        run: npx wait-on http-get://localhost:8000/health --timeout 30000
 
       - name: Mostrar logs de uvicorn si falló
         if: failure()
