@@ -66,7 +66,7 @@ jobs:
           cache: "pnpm"
 
       - name: Instalar dependencias
-        run: pnpm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Correr ESLint
         run: pnpm run lint
