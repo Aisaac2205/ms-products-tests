@@ -12,9 +12,9 @@ name: E2E Tests — ms-products-api
 on:
   # Cuando se modifica algo en este repo de tests
   push:
-    branches: [main, develop]
+    branches: [master, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [master, develop]
 
   # Cuando el repo de la API lo dispara remotamente
   workflow_dispatch:
@@ -119,7 +119,7 @@ jobs:
           ADMIN_USERNAME: admin
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
 
-      - name: ⏳ Esperar que la API esté lista
+      - name: Esperar que la API esté lista
         run: npx wait-on http://localhost:8000/health --timeout 30000
 
       # ── Instalar y correr Playwright ─────────────────────

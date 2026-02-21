@@ -1,8 +1,8 @@
 # ms-products-tests 🧪
 
-Suite de tests E2E para [ms-products-api](https://github.com/TU_USUARIO/ms-products-api) usando **Playwright** y **TypeScript**.
+Suite de tests E2E para [ms-products-api](https://github.com/Aisaac2205/ms-products-api) usando **Playwright** y **TypeScript**.
 
-![CI](https://github.com/TU_USUARIO/ms-products-tests/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Aisaac2205/ms-products-tests/actions/workflows/ci.yml/badge.svg)
 
 ## Stack
 
