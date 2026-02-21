@@ -1,26 +1,18 @@
 # ============================================================
 # ms-products-tests — .github/workflows/ci.yml
-#
-# Pipeline principal del equipo SQA.
-# Se puede disparar de dos formas:
-#   1. Manualmente (workflow_dispatch) desde GitHub UI
-#   2. Automáticamente desde ms-products-api cuando hay un push
 # ============================================================
 
-name: E2E Tests — ms-products-api
+name: E2E Tests - ms-products-api
 
 on:
-  # Cuando se modifica algo en este repo de tests
   push:
     branches: [master, develop]
   pull_request:
     branches: [master, develop]
-
-  # Cuando el repo de la API lo dispara remotamente
   workflow_dispatch:
     inputs:
       triggered_by:
-        description: "¿Quién disparó este workflow?"
+        description: "Quien disparo este workflow?"
         required: false
         default: "manual"
       commit_sha:
@@ -36,29 +28,27 @@ env:
 
 jobs:
 
-  # ── INFO: mostrar contexto del trigger ───────────────────
   context:
     name: Contexto del trigger
     runs-on: ubuntu-latest
     steps:
-      - name: Mostrar quién disparó el pipeline
+      - name: Mostrar quien disparo el pipeline
         run: |
           echo "Disparado por: ${{ github.event.inputs.triggered_by || 'push/PR directo' }}"
           echo "API commit SHA: ${{ github.event.inputs.commit_sha || 'N/A' }}"
           echo "API branch: ${{ github.event.inputs.branch || 'N/A' }}"
 
-  # ── STAGE 1: Lint del código TypeScript ──────────────────
   lint:
     name: Lint TypeScript
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
-
-      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
@@ -71,13 +61,11 @@ jobs:
       - name: Correr ESLint
         run: pnpm run lint
 
-  # ── STAGE 2: E2E Tests ───────────────────────────────────
   e2e:
     name: E2E Tests con Playwright
     runs-on: ubuntu-latest
     needs: [lint]
 
-    # ── Service: PostgreSQL ──────────────────────────────
     services:
       postgres:
         image: postgres:15
@@ -96,14 +84,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── Levantar la API (FastAPI) ────────────────────────
       - name: Clonar ms-products-api
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/ms-products-api
-          # Si el repo es privado, necesitas el PAT_TOKEN aquí también
-          # token: ${{ secrets.PAT_TOKEN }}
-          path: api  # Se clona en la carpeta ./api
+          path: api
 
       - uses: actions/setup-python@v5
         with:
@@ -125,24 +110,28 @@ jobs:
           ADMIN_USERNAME: admin
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
 
-      - name: Esperar que la API esté lista
+      - name: Esperar que la API este lista
         run: npx wait-on http-get://localhost:8000/health --timeout 30000
 
-      - name: Mostrar logs de uvicorn si falló
+      - name: Mostrar logs de uvicorn si fallo
         if: failure()
         run: cat /tmp/uvicorn.log
 
-      # ── Instalar y correr Playwright ─────────────────────
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
 
       - name: Instalar dependencias Playwright
-        run: pnpm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Instalar browsers
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Correr tests E2E
         run: pnpm test
@@ -150,7 +139,6 @@ jobs:
           BASE_URL: http://localhost:8000
           CI: true
 
-      # ── Reporte ──────────────────────────────────────────
       - name: Subir reporte HTML
         uses: actions/upload-artifact@v4
         if: always()
@@ -159,7 +147,6 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-  # ── STAGE 3: Resumen final ────────────────────────────────
   summary:
     name: Resultado Final
     runs-on: ubuntu-latest
@@ -174,5 +161,5 @@ jobs:
       - name: Tests fallaron
         if: needs.e2e.result == 'failure'
         run: |
-          echo "Tests fallaron. Revisar el reporte en la sección Artifacts."
+          echo "Tests fallaron. Revisar el reporte en la seccion Artifacts."
           exit 1
