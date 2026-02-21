@@ -26,7 +26,7 @@ tests/
 
 ```bash
 # 1. Instalar dependencias
-npm install
+pnpm install
 
 # 2. Instalar browsers de Playwright
 npx playwright install chromium
@@ -34,10 +34,10 @@ npx playwright install chromium
 # 3. Asegurarte que ms-products-api está corriendo en localhost:8000
 
 # 4. Correr todos los tests
-npm test
+pnpm test
 
 # 5. Ver el reporte HTML
-npm run test:report
+pnpm run test:report
 ```
 
 ## Suites disponibles
